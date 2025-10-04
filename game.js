@@ -11,8 +11,8 @@ let isMyTurn = false;
 let isBlack = false;
 
 // API基础URL - 统一管理服务器地址和端口
-const BASE_URL = 'https://115.190.169.197:3001';
-const WS_URL = 'wss://115.190.169.197:3001';
+const BASE_URL = 'http://115.190.169.197:3001'; // 后端API基础URL，使用正确的后端服务器地址
+const WS_URL = 'ws://115.190.169.197:3001'; // WebSocket服务器地址
 // 音频对象
 const audio = {
     move: new Audio('./audio/down.wav'),
@@ -100,9 +100,9 @@ const canvas = document.getElementById('chessboard');
 const ctx = canvas.getContext('2d');
 
 // 棋盘参数
-const BOARD_SIZE = 15;
-const CELL_SIZE = canvas.width / BOARD_SIZE;
-const BOARD_PADDING = 20;
+let BOARD_SIZE = 15; // 改为变量以支持自适应
+let CELL_SIZE; // 单元格大小在resizeCanvas中动态计算
+let BOARD_PADDING = 20; // 改为变量以支持自适应
 
 // 初始化
 function init() {
@@ -136,18 +136,79 @@ function init() {
     document.getElementById('give-up-btn').addEventListener('click', giveUp);
     document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
     
-
-    
     // 模态框关闭事件
     document.querySelector('.close').addEventListener('click', () => {
         modal.style.display = 'none';
     });
+    
+    // 设置自适应棋盘大小
+    resizeCanvas();
+    
+    // 绑定窗口大小变化事件
+    window.addEventListener('resize', resizeCanvas);
+    
+    // 绑定触摸事件（支持移动设备）
+    canvas.addEventListener('touchstart', handleTouchEvent, { passive: false });
+    canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false }); // 防止页面缩放
+    canvas.addEventListener('touchend', handleTouchEvent, { passive: false });
     
     // 棋盘点击事件
     canvas.addEventListener('click', handleCanvasClick);
     
     // 绘制棋盘
     drawChessboard();
+}
+
+// 调整画布大小以适应屏幕
+function resizeCanvas() {
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const isMobile = windowWidth < 768;
+    
+    // 计算合适的棋盘大小
+    let maxSize;
+    if (isMobile) {
+        // 移动设备上使用屏幕宽度的90%
+        maxSize = windowWidth * 0.9;
+        BOARD_PADDING = 15; // 移动设备上减少边距
+    } else {
+        // 桌面设备上使用较小的值，确保棋盘不会太大
+        maxSize = Math.min(windowWidth * 0.6, windowHeight * 0.8);
+        BOARD_PADDING = 20;
+    }
+    
+    // 计算单元格大小
+    CELL_SIZE = (maxSize - 2 * BOARD_PADDING) / (BOARD_SIZE - 1);
+    
+    // 设置画布大小
+    canvas.width = maxSize;
+    canvas.height = maxSize;
+    
+    // 调整游戏面板样式
+    gamePanel.style.maxWidth = maxSize + 'px';
+    
+    // 重新绘制棋盘
+    if (gameState) {
+        drawChessboard();
+    }
+}
+
+// 处理触摸事件
+function handleTouchEvent(event) {
+    event.preventDefault(); // 防止页面滚动和缩放
+    
+    if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        // 创建一个模拟的鼠标事件
+        const clickEvent = new MouseEvent('click', {
+            clientX: touch.clientX,
+            clientY: touch.clientY,
+            bubbles: true,
+            cancelable: true
+        });
+        // 触发点击事件
+        canvas.dispatchEvent(clickEvent);
+    }
 }
 
 // 用户登录 - 离线优先模式
@@ -239,60 +300,32 @@ async function createRoom() {
         }
     } catch (error) {
         console.error('创建房间API调用失败:', error);
-        alert('当前为离线模式，无法创建房间。请使用人机对战功能。');
+        // 显示友好的错误提示，而不是技术错误
+        alert('创建房间失败，请稍后重试或使用人机对战模式');
         modal.style.display = 'none';
     }
 }
 
-// 显示房间列表 - 联网模式，调用后端API
-async function showRoomList() {
-    try {
-        // 调用后端获取房间列表API
-        const response = await fetch(`${BASE_URL}/api/rooms`);
-        const data = await response.json();
+// 显示加入房间模态框，让用户输入房间号
+function showRoomList() {
+    modalTitleEl.textContent = '加入房间';
+    modalBodyEl.innerHTML = `
+        <input type="number" id="room-id-input" placeholder="请输入房间号" required>
+        <button id="confirm-join-room">加入</button>
+    `;
+    modal.style.display = 'block';
+    
+    document.getElementById('confirm-join-room').addEventListener('click', function() {
+        const roomId = document.getElementById('room-id-input').value.trim();
         
-        if (data.success) {
-            // 显示房间列表面板
-            menuPanel.style.display = 'none';
-            roomsContainer.style.display = 'block';
-            roomListEl.innerHTML = '';
-            
-            // 如果没有房间，显示提示信息
-            if (data.rooms.length === 0) {
-                roomListEl.innerHTML = '<p class="no-rooms">暂无可用房间</p>';
-                return;
-            }
-            
-            // 渲染房间列表
-            data.rooms.forEach(room => {
-                if (room.status === 'waiting') { // 只显示等待中的房间
-                    const roomItem = document.createElement('div');
-                    roomItem.className = 'room-item';
-                    roomItem.innerHTML = `
-                        <div class="room-info">
-                            <h3>${room.roomName}</h3>
-                            <p>房主: ${room.hostName}</p>
-                        </div>
-                        <button class="join-room-btn" data-id="${room.id}">加入</button>
-                    `;
-                    roomListEl.appendChild(roomItem);
-                }
-            });
-            
-            // 绑定加入房间按钮事件
-            document.querySelectorAll('.join-room-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const roomId = this.getAttribute('data-id');
-                    joinRoom(roomId);
-                });
-            });
-        } else {
-            alert('获取房间列表失败: ' + (data.error || '未知错误'));
+        if (!roomId) {
+            alert('请输入房间号');
+            return;
         }
-    } catch (error) {
-        console.error('获取房间列表API调用失败:', error);
-        alert('当前为离线模式，无法查看房间列表。请使用人机对战功能。');
-    }
+        
+        modal.style.display = 'none';
+        joinRoom(roomId);
+    });
 }
 
 // 加入房间 - 联网模式，调用后端API
@@ -318,7 +351,7 @@ async function joinRoom(roomId) {
         }
     } catch (error) {
         console.error('加入房间API调用失败:', error);
-        alert('当前为离线模式，无法加入房间。请使用人机对战功能。');
+        alert('网络连接失败，请检查您的网络连接后重试。');
     }
 }
 
@@ -326,8 +359,9 @@ async function joinRoom(roomId) {
 function joinGameRoom(roomId) {
     currentRoomId = roomId;
     
-    // 显示游戏面板
+    // 显示游戏面板并隐藏左侧菜单
     gamePanel.style.display = 'block';
+    menuPanel.style.display = 'none'; // 隐藏左侧菜单
     
     try {
         // 建立WebSocket连接
@@ -428,7 +462,7 @@ function handleCanvasClick(event) {
     if (!isMyTurn) return;
     
     // 计算落子位置
-    const rect = chessboard.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const boardX = Math.round((event.clientX - rect.left - BOARD_PADDING) / CELL_SIZE);
     const boardY = Math.round((event.clientY - rect.top - BOARD_PADDING) / CELL_SIZE);
     
@@ -463,12 +497,10 @@ function handleCanvasClick(event) {
             
             // 模拟AI延迟
             setTimeout(() => {
-                // AI随机落子
-                let aiX, aiY;
-                do {
-                    aiX = Math.floor(Math.random() * BOARD_SIZE);
-                    aiY = Math.floor(Math.random() * BOARD_SIZE);
-                } while (gameState.board[aiX][aiY] !== 0);
+                // 使用优化的AI算法获取落子位置
+                const aiMove = getAIMove();
+                const aiX = aiMove.x;
+                const aiY = aiMove.y;
                 
                 gameState.board[aiX][aiY] = 1; // AI执白
                 gameState.moves++;
@@ -584,12 +616,16 @@ function drawChessboard() {
         }
     }
     
-    // 绘制当前回合指示器
+    // 绘制当前回合指示器（自适应大小）
+    const indicatorSize = Math.max(8, CELL_SIZE / 5); // 最小8px，最大为单元格的1/5
+    const indicatorX = Math.max(20, BOARD_PADDING / 1.5); // 位置自适应
+    const indicatorY = Math.max(20, BOARD_PADDING / 1.5);
+    
     ctx.fillStyle = gameState.currentPlayer === 2 ? '#000' : '#fff';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(30, 30, 10, 0, 2 * Math.PI);
+    ctx.arc(indicatorX, indicatorY, indicatorSize, 0, 2 * Math.PI);
     ctx.fill();
     ctx.stroke();
 }
@@ -693,15 +729,21 @@ function handleOfflineCanvasClick(event) {
     }
 }
 
-// 获取AI下棋位置（增强版AI）
+// 获取AI下棋位置（优化版AI）
 function getAIMove() {
     let bestScore = -Infinity;
     let bestMove = null;
+    let moveScores = [];
     
     // 对每个空位进行评分
     for (let i = 0; i < BOARD_SIZE; i++) {
         for (let j = 0; j < BOARD_SIZE; j++) {
             if (gameState.board[i][j] === 0) {
+                // 检查是否有邻近棋子，如果没有则跳过（减少不必要的计算）
+                if (!hasNearbyPiece(i, j) && gameState.moves > 5) {
+                    continue;
+                }
+                
                 // 计算AI落子的分数
                 gameState.board[i][j] = 1; // AI执白
                 const aiScore = evaluatePosition(gameState.board, i, j, 1);
@@ -712,12 +754,29 @@ function getAIMove() {
                 const playerScore = evaluatePosition(gameState.board, i, j, 2);
                 gameState.board[i][j] = 0; // 撤销
                 
-                // 综合评分（进攻略优于防守）
-                let score = aiScore * 0.55 + playerScore * 0.45;
+                // 优化评分机制：根据游戏阶段动态调整进攻/防守权重
+                let attackWeight = 0.55;
+                let defenseWeight = 0.45;
                 
-                // 如果是中心区域，额外加分
-                if (i >= 5 && i <= 9 && j >= 5 && j <= 9) {
-                    score += 100;
+                // 游戏初期更注重布局，中后期更注重进攻
+                if (gameState.moves < 15) {
+                    attackWeight = 0.45;
+                    defenseWeight = 0.45;
+                } else if (gameState.moves > 40) {
+                    attackWeight = 0.65;
+                    defenseWeight = 0.35;
+                }
+                
+                // 综合评分
+                let score = aiScore * attackWeight + playerScore * defenseWeight;
+                
+                // 优化位置评估：根据与中心距离动态调整加分
+                const centerDist = Math.sqrt(Math.pow(i - 7, 2) + Math.pow(j - 7, 2));
+                score += Math.max(0, 100 - centerDist * 10); // 中心加分，距离越远加分越少
+                
+                // 记录有价值的位置
+                if (score > 100) {
+                    moveScores.push({ x: i, y: j, score: score });
                 }
                 
                 if (score > bestScore) {
@@ -728,7 +787,38 @@ function getAIMove() {
         }
     }
     
+    // 从高分位置中随机选择（增加AI行为的不确定性）
+    if (moveScores.length > 0) {
+        // 只保留前30%的高分位置
+        const topMoves = moveScores
+            .sort((a, b) => b.score - a.score)
+            .slice(0, Math.ceil(moveScores.length * 0.3));
+        
+        // 从高分位置中随机选择一个
+        if (topMoves.length > 1 && Math.random() < 0.3) { // 30%概率随机选择
+            const randomIndex = Math.floor(Math.random() * topMoves.length);
+            return topMoves[randomIndex];
+        }
+    }
+    
     return bestMove || { x: 7, y: 7 }; // 确保总是有一个有效位置
+}
+
+// 检查是否有邻近棋子（优化性能）
+function hasNearbyPiece(x, y) {
+    for (let dx = -2; dx <= 2; dx++) {
+        for (let dy = -2; dy <= 2; dy++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
+                if (gameState.board[nx][ny] !== 0) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 // 评估位置价值
@@ -740,15 +830,23 @@ function evaluatePosition(board, x, y, player) {
         [1, -1]   // 反对角线
     ];
     
-    let maxScore = 0;
+    let totalScore = 0;
+    let directionScores = [];
     
     for (const [dx, dy] of directions) {
         // 检查该方向的棋子情况
         const score = evaluateDirection(board, x, y, dx, dy, player);
-        maxScore = Math.max(maxScore, score);
+        directionScores.push(score);
+        totalScore += score;
     }
     
-    return maxScore;
+    // 额外考虑棋型组合的价值（如双三、双四等）
+    const highScores = directionScores.filter(s => s >= 500);
+    if (highScores.length >= 2) {
+        totalScore += 5000; // 双三或以上组合加成
+    }
+    
+    return totalScore;
 }
 
 // 评估特定方向的价值
