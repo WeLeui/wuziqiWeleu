@@ -12,11 +12,11 @@ let isBlack = false;
 
 // 音频对象
 const audio = {
-    move: new Audio('../../audio/down.wav'),
-    start: new Audio('../../audio/start.wav'),
-    win: new Audio('../../audio/winner.wav'),
-    lose: new Audio('../../audio/loser.wav'),
-    draw: new Audio('../../audio/pingju.wav')
+    move: new Audio('./audio/down.wav'),
+    start: new Audio('./audio/start.wav'),
+    win: new Audio('./audio/winner.wav'),
+    lose: new Audio('./audio/loser.wav'),
+    draw: new Audio('./audio/pingju.wav')
 };
 
 // 播放音效函数
