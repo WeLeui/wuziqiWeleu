@@ -11,8 +11,10 @@ let isMyTurn = false;
 let isBlack = false;
 
 // API基础URL - 统一管理服务器地址和端口
-const BASE_URL = 'http://115.190.169.197:3001'; // 后端API基础URL，使用正确的后端服务器地址
-const WS_URL = 'ws://115.190.169.197:3001'; // WebSocket服务器地址
+// 使用相对路径或根据当前页面协议自动选择HTTP/HTTPS
+const useHttps = window.location.protocol === 'https:';
+const BASE_URL = useHttps ? 'https://115.190.169.197:3001' : 'http://115.190.169.197:3001'; // 根据当前页面协议选择合适的API地址
+const WS_URL = useHttps ? 'wss://115.190.169.197:3001' : 'ws://115.190.169.197:3001'; // WebSocket服务器地址，注意使用wss对应https
 // 音频对象
 const audio = {
     move: new Audio('./audio/down.wav'),
