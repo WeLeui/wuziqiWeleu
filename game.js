@@ -19,17 +19,58 @@ const audio = {
     draw: new Audio('./audio/pingju.wav')
 };
 
+// 预加载音频
+function preloadAudio() {
+    // 设置音量（可选）
+    Object.values(audio).forEach(sound => {
+        sound.volume = 0.5; // 设置音量为50%
+    });
+    
+    // 尝试加载音频（可能需要用户交互后才能完整加载）
+    Object.values(audio).forEach(sound => {
+        try {
+            // 避免使用可能不存在的load()方法
+            sound.loaded = false;
+            sound.oncanplaythrough = () => {
+                sound.loaded = true;
+            };
+        } catch (e) {
+            console.log('音频预加载失败:', e);
+        }
+    });
+}
+
 // 播放音效函数
 function playSound(type) {
     try {
-        // 停止当前播放并重置
-        if (audio[type]) {
-            audio[type].pause();
-            audio[type].currentTime = 0;
-            audio[type].play().catch(e => console.log('音效播放失败:', e));
+        if (!audio[type]) {
+            console.warn('未找到指定类型的音效:', type);
+            return;
         }
+        
+        // 创建新的音频实例，避免重用同一实例可能导致的问题
+        const soundSrc = audio[type].src;
+        const sound = new Audio(soundSrc);
+        sound.volume = 0.5;
+        
+        // 尝试播放，添加更详细的错误处理
+        sound.play().then(() => {
+            console.log('音效播放成功:', type);
+        }).catch(e => {
+            console.log('音效播放失败:', type, e);
+            
+            // 提供更详细的错误类型
+            if (e.name === 'NotAllowedError') {
+                console.log('提示: 浏览器策略要求用户交互后才能播放音频');
+                // 可以在这里添加一个提示，引导用户点击页面
+            } else if (e.name === 'NotSupportedError') {
+                console.log('提示: 浏览器不支持该音频格式');
+            } else if (e.name === 'AbortError') {
+                console.log('提示: 音频加载被中止');
+            }
+        });
     } catch (error) {
-        console.error('播放音效时出错:', error);
+        console.error('播放音效时出错:', type, error);
     }
 }
 
@@ -62,6 +103,17 @@ const BOARD_PADDING = 20;
 
 // 初始化
 function init() {
+    // 预加载音频
+    preloadAudio();
+    
+    // 添加用户交互事件来解锁音频播放（点击页面任何位置）
+    document.addEventListener('click', () => {
+        // 尝试播放静音的音频来解锁策略限制
+        const unlockAudio = new Audio('./audio/down.wav');
+        unlockAudio.volume = 0; // 静音播放
+        unlockAudio.play().catch(() => {});
+    }, { once: true }); // 只执行一次
+    
     // 登录事件
     document.getElementById('login-btn').addEventListener('click', login);
     document.getElementById('username').addEventListener('keypress', (e) => {
