@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋游戏</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 登录界面 -->
+    <div id="login-container" class="container">
+        <h1>五子棋游戏</h1>
+        <div class="login-form">
+            <input type="text" id="username" placeholder="请输入您的昵称" required>
+            <button id="login-btn">开始游戏</button>
+        </div>
+    </div>
+
+    <!-- 主界面 -->
+    <div id="main-container" class="container" style="display: none;">
+        <div class="header">
+            <h1>五子棋游戏</h1>
+            <div class="user-info">
+                <div id="user-avatar" class="avatar">U</div>
+                <span id="current-user"></span>
+                <button id="logout-btn">退出</button>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="menu-panel">
+                <h2>游戏菜单</h2>
+                <button id="create-room-btn">创建房间</button>
+                <button id="join-room-btn">加入房间</button>
+                <button id="offline-game-btn">人机对战</button>
+                <button id="rank-btn">排行榜</button>
+            </div>
+            
+            <div id="room-list" class="room-list" style="display: none;">
+                <h2>房间列表</h2>
+                <div id="rooms-container"></div>
+                <button id="back-to-menu">返回菜单</button>
+            </div>
+            
+            <div id="game-panel" class="game-panel" style="display: none;">
+                <div class="game-info">
+                    <div class="player-info">
+                    <div class="player">
+                        <div id="player1-avatar" class="avatar">P1</div>
+                        <span>玩家1: <span id="player1"></span></span>
+                    </div>
+                    <div class="player">
+                        <div id="player2-avatar" class="avatar">P2</div>
+                        <span>玩家2: <span id="player2"></span></span>
+                    </div>
+                </div>
+                    <div class="game-status">
+                        <span id="status-message"></span>
+                    </div>
+                </div>
+                
+                <div class="chessboard-container">
+                    <canvas id="chessboard" width="500" height="500"></canvas>
+                </div>
+                
+                <div class="game-controls">
+                    <button id="give-up-btn">认输</button>
+                    <button id="leave-room-btn">离开房间</button>
+                </div>
+            </div>
+            
+            <div id="rank-panel" class="rank-panel" style="display: none;">
+                <h2>排行榜</h2>
+                <table id="rank-table">
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>昵称</th>
+                            <th>胜场</th>
+                            <th>负场</th>
+                            <th>平局</th>
+                            <th>胜率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rank-body"></tbody>
+                </table>
+                <button id="back-from-rank">返回菜单</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 -->
+    <div id="modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="modal-title"></h3>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- 移除socket.io引用，使用原生WebSocket -->
+    <script src="game.js"></script>
+</body>
+</html>
