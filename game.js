@@ -1,6 +1,5 @@
 // 全局变量
 let currentUser = null;
-let ws = null;
 let currentRoomId = null;
 let gameState = {
     board: Array(15).fill().map(() => Array(15).fill(0)), // 0:空, 1:白, 2:黑
@@ -10,9 +9,7 @@ let gameState = {
 let isMyTurn = false;
 let isBlack = false;
 
-// API基础URL - 统一管理服务器地址和端口
-const BASE_URL = 'http://115.190.169.197:3001';
-const WS_URL = 'ws://115.190.169.197:3001';
+// 游戏常量 - 离线模式下不需要服务器URL
 
 // 音频对象
 const audio = {
@@ -137,8 +134,7 @@ function init() {
     document.getElementById('give-up-btn').addEventListener('click', giveUp);
     document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
     
-    // 排行榜按钮事件
-    // 已移除排行榜功能，无需返回按钮事件
+
     
     // 模态框关闭事件
     document.querySelector('.close').addEventListener('click', () => {
@@ -152,8 +148,8 @@ function init() {
     drawChessboard();
 }
 
-// 用户登录
-async function login() {
+// 用户登录 - 完全离线模式
+function login() {
     const username = document.getElementById('username').value.trim();
     
     if (!username) {
@@ -161,19 +157,19 @@ async function login() {
         return;
     }
     
-    // 离线模式：不调用后端API，直接模拟登录成功
+    // 纯离线模式：不调用任何API，直接创建本地用户
     currentUser = {
         id: Date.now().toString(), // 使用时间戳作为临时ID
         name: username
     };
     
+    // 更新界面显示
     currentUserEl.textContent = `欢迎, ${currentUser.name}`;
-    // 设置头像为用户名的首字母大写
     userAvatarEl.textContent = username.charAt(0).toUpperCase();
     loginContainer.style.display = 'none';
     mainContainer.style.display = 'block';
     
-    // 无需后端验证，直接进入游戏菜单
+    console.log('离线登录成功，用户名:', username);
 }
 
 // 显示创建房间模态框
@@ -211,9 +207,10 @@ async function joinRoom(roomId) {
 
 // WebSocket消息处理函数已移除，因为离线模式下不需要
 
-// 处理棋盘点击
+// 处理棋盘点击 - 离线模式版本
 function handleCanvasClick(event) {
-    if (!isMyTurn || !currentRoomId) return;
+    // 离线模式下无需检查currentRoomId
+    if (!isMyTurn) return;
     
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
@@ -230,14 +227,32 @@ function handleCanvasClick(event) {
             // 播放落子音效
             playSound('move');
             
-            // 发送移动消息
-            ws.send(JSON.stringify({
-                type: 'move',
-                x: boardX,
-                y: boardY
-            }));
+            // 离线模式：直接在本地落子
+            gameState.board[boardX][boardY] = gameState.currentPlayer;
+            gameState.moves++;
             
+            // 绘制更新后的棋盘
+            drawChessboard();
+            
+            // 检查游戏是否结束
+            if (checkWin(boardX, boardY)) {
+                statusMessageEl.textContent = '恭喜，你赢了！';
+                playSound('win');
+                return;
+            } else if (gameState.moves >= BOARD_SIZE * BOARD_SIZE) {
+                statusMessageEl.textContent = '平局！';
+                playSound('draw');
+                return;
+            }
+            
+            // 切换玩家
+            gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
             isMyTurn = false;
+            
+            // 模拟AI延迟响应
+            setTimeout(() => {
+                makeAIMove();
+            }, 500);
         }
     }
 }
@@ -594,25 +609,74 @@ function checkWin(board, x, y, player) {
     return false;
 }
 
-// 排行榜显示函数已移除，因为离线模式下不需要
+// AI移动函数 - 简单的AI逻辑
+function makeAIMove() {
+    // 尝试找到一个空位
+    for (let i = 0; i < BOARD_SIZE; i++) {
+        for (let j = 0; j < BOARD_SIZE; j++) {
+            if (gameState.board[i][j] === 0) {
+                // 播放落子音效
+                playSound('move');
+                
+                // AI落子
+                gameState.board[i][j] = gameState.currentPlayer;
+                gameState.moves++;
+                
+                // 绘制更新后的棋盘
+                drawChessboard();
+                
+                // 检查游戏是否结束
+                if (checkWin(i, j)) {
+                    statusMessageEl.textContent = '很遗憾，你输了！';
+                    playSound('lose');
+                    return;
+                } else if (gameState.moves >= BOARD_SIZE * BOARD_SIZE) {
+                    statusMessageEl.textContent = '平局！';
+                    playSound('draw');
+                    return;
+                }
+                
+                // 切换玩家，轮到用户
+                gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
+                isMyTurn = true;
+                
+                return;
+            }
+        }
+    }
+}
 
-// 认输
+// 重置游戏状态
+function resetGameState() {
+    gameState = {
+        board: Array(15).fill().map(() => Array(15).fill(0)), // 0:空, 1:白, 2:黑
+        currentPlayer: 2, // 黑棋先行
+        moves: 0
+    };
+    isMyTurn = false;
+    isBlack = false;
+    currentRoomId = null;
+    
+    // 清空棋盘
+    drawChessboard();
+}
+
+// 认输 - 离线模式版本
 function giveUp() {
     if (confirm('确定要认输吗？')) {
-        if (currentRoomId && ws) {
-            ws.send(JSON.stringify({ type: 'give_up' }));
-        }
+        // 离线模式下无需发送消息到服务器
+        statusMessageEl.textContent = '你已认输！';
+        playSound('lose');
+        
         showMenu();
     }
 }
 
-// 离开房间
+// 离开房间 - 离线模式版本
 function leaveRoom() {
-    if (confirm('确定要离开房间吗？')) {
-        if (currentRoomId && ws) {
-            ws.send(JSON.stringify({ type: 'leave' }));
-            ws.close();
-        }
+    if (confirm('确定要离开游戏吗？')) {
+        // 离线模式下无需发送消息到服务器
+        resetGameState();
         showMenu();
     }
 }
