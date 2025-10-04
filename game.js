@@ -159,19 +159,30 @@ async function login() {
     }
     
     try {
-        // 模拟登录成功，本地创建用户对象
-        currentUser = {
-            id: Date.now(), // 使用时间戳作为临时ID
-            name: username
-        };
+        // 调用后端登录API
+        const response = await fetch('http://115.190.169.197:3001/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name: username })
+        });
         
-        currentUserEl.textContent = `欢迎, ${currentUser.name}`;
-        // 设置头像为用户名的首字母大写
-        userAvatarEl.textContent = username.charAt(0).toUpperCase();
-        loginContainer.style.display = 'none';
-        mainContainer.style.display = 'block';
+        const data = await response.json();
+        
+        if (data.success) {
+            currentUser = data.user;
+            currentUserEl.textContent = `欢迎, ${currentUser.name}`;
+            // 设置头像为用户名的首字母大写
+            userAvatarEl.textContent = username.charAt(0).toUpperCase();
+            loginContainer.style.display = 'none';
+            mainContainer.style.display = 'block';
+        } else {
+            alert('登录失败: ' + (data.error || '未知错误'));
+        }
     } catch (error) {
         alert('登录错误: ' + error.message);
+        console.error('登录API调用失败:', error);
     }
 }
 
@@ -192,7 +203,8 @@ async function createRoom() {
     const roomName = document.getElementById('room-name').value.trim() || `房间${Date.now()}`;
     
     try {
-        const response = await fetch('http://localhost:3000/api/rooms', {
+        // 将localhost改为服务器IP地址，并更新端口为3001
+const response = await fetch('http://115.190.169.197:3001/api/rooms', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -220,7 +232,7 @@ async function showRoomList() {
     roomListEl.style.display = 'block';
     
     try {
-        const response = await fetch('http://localhost:3000/api/rooms');
+        const response = await fetch('http://115.190.169.197:3001/api/rooms');
         const data = await response.json();
         
         if (data.success) {
@@ -251,7 +263,7 @@ async function showRoomList() {
 // 加入房间
 async function joinRoom(roomId) {
     try {
-        const response = await fetch(`http://localhost:3000/api/rooms/${roomId}/join`, {
+        const response = await fetch(`http://115.190.169.197:3001/api/rooms/${roomId}/join`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -289,7 +301,7 @@ function joinGameRoom(roomId, isCreator) {
     
     // 建立WebSocket连接
     try {
-        ws = new WebSocket(`ws://localhost:3000?userId=${currentUser.id}&roomId=${roomId}`);
+        ws = new WebSocket(`ws://115.190.169.197:3001?userId=${currentUser.id}&roomId=${roomId}`);
         
         ws.onopen = () => {
             console.log('WebSocket连接已建立');
