@@ -10,6 +10,10 @@ let gameState = {
 let isMyTurn = false;
 let isBlack = false;
 
+// API基础URL - 统一管理服务器地址和端口
+const BASE_URL = 'http://115.190.169.197:3001';
+const WS_URL = 'ws://115.190.169.197:3001';
+
 // 音频对象
 const audio = {
     move: new Audio('./audio/down.wav'),
@@ -124,7 +128,6 @@ function init() {
     document.getElementById('create-room-btn').addEventListener('click', showCreateRoomModal);
     document.getElementById('join-room-btn').addEventListener('click', showRoomList);
     document.getElementById('offline-game-btn').addEventListener('click', startOfflineGame);
-    document.getElementById('rank-btn').addEventListener('click', showRankings);
     document.getElementById('logout-btn').addEventListener('click', logout);
     
     // 房间列表按钮事件
@@ -135,7 +138,7 @@ function init() {
     document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
     
     // 排行榜按钮事件
-    document.getElementById('back-from-rank').addEventListener('click', showMenu);
+    // 已移除排行榜功能，无需返回按钮事件
     
     // 模态框关闭事件
     document.querySelector('.close').addEventListener('click', () => {
@@ -158,32 +161,19 @@ async function login() {
         return;
     }
     
-    try {
-        // 调用后端登录API
-        const response = await fetch('http://115.190.169.197:3001/api/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ name: username })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            currentUser = data.user;
-            currentUserEl.textContent = `欢迎, ${currentUser.name}`;
-            // 设置头像为用户名的首字母大写
-            userAvatarEl.textContent = username.charAt(0).toUpperCase();
-            loginContainer.style.display = 'none';
-            mainContainer.style.display = 'block';
-        } else {
-            alert('登录失败: ' + (data.error || '未知错误'));
-        }
-    } catch (error) {
-        alert('登录错误: ' + error.message);
-        console.error('登录API调用失败:', error);
-    }
+    // 离线模式：不调用后端API，直接模拟登录成功
+    currentUser = {
+        id: Date.now().toString(), // 使用时间戳作为临时ID
+        name: username
+    };
+    
+    currentUserEl.textContent = `欢迎, ${currentUser.name}`;
+    // 设置头像为用户名的首字母大写
+    userAvatarEl.textContent = username.charAt(0).toUpperCase();
+    loginContainer.style.display = 'none';
+    mainContainer.style.display = 'block';
+    
+    // 无需后端验证，直接进入游戏菜单
 }
 
 // 显示创建房间模态框
@@ -200,178 +190,26 @@ function showCreateRoomModal() {
 
 // 创建房间
 async function createRoom() {
-    const roomName = document.getElementById('room-name').value.trim() || `房间${Date.now()}`;
-    
-    try {
-        // 将localhost改为服务器IP地址，并更新端口为3001
-const response = await fetch('http://115.190.169.197:3001/api/rooms', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ userId: currentUser.id, roomName })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            modal.style.display = 'none';
-            currentRoomId = data.room.id;
-            joinGameRoom(currentRoomId, true);
-        } else {
-            alert('创建房间失败: ' + data.error);
-        }
-    } catch (error) {
-        alert('创建房间错误: ' + error.message);
-    }
+    // 离线模式下不支持创建房间
+    alert('当前为离线模式，无法创建房间。请使用人机对战功能。');
+    modal.style.display = 'none';
 }
 
 // 显示房间列表
 async function showRoomList() {
-    menuPanel.style.display = 'none';
-    roomListEl.style.display = 'block';
-    
-    try {
-        const response = await fetch('http://115.190.169.197:3001/api/rooms');
-        const data = await response.json();
-        
-        if (data.success) {
-            roomsContainer.innerHTML = '';
-            
-            if (data.rooms.length === 0) {
-                roomsContainer.innerHTML = '<p>暂无可用房间</p>';
-            } else {
-                data.rooms.forEach(room => {
-                    const roomItem = document.createElement('div');
-                    roomItem.className = 'room-item';
-                    roomItem.innerHTML = `
-                        <div>房间名称: ${room.roomName}</div>
-                        <div>等待玩家加入...</div>
-                    `;
-                    roomItem.addEventListener('click', () => {
-                        joinRoom(room.id);
-                    });
-                    roomsContainer.appendChild(roomItem);
-                });
-            }
-        }
-    } catch (error) {
-        alert('获取房间列表错误: ' + error.message);
-    }
+    // 离线模式下不支持查看房间列表
+    alert('当前为离线模式，无法查看房间列表。请使用人机对战功能。');
 }
 
 // 加入房间
 async function joinRoom(roomId) {
-    try {
-        const response = await fetch(`http://115.190.169.197:3001/api/rooms/${roomId}/join`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ userId: currentUser.id })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            currentRoomId = roomId;
-            joinGameRoom(roomId, false);
-        } else {
-            alert('加入房间失败: ' + data.error);
-        }
-    } catch (error) {
-        alert('加入房间错误: ' + error.message);
-    }
+    // 离线模式下不支持加入房间
+    alert('当前为离线模式，无法加入房间。请使用人机对战功能。');
 }
 
-// 加入游戏房间（建立WebSocket连接）
-function joinGameRoom(roomId, isCreator) {
-    roomListEl.style.display = 'none';
-    gamePanel.style.display = 'block';
-    
-    isBlack = isCreator;
-    
-    // 更新玩家信息
-    player1El.textContent = isCreator ? currentUser.name : '等待玩家...';
-    player2El.textContent = isCreator ? '等待玩家...' : currentUser.name;
-    player1AvatarEl.textContent = isCreator ? currentUser.name.charAt(0).toUpperCase() : '?';
-    player2AvatarEl.textContent = isCreator ? '?' : currentUser.name.charAt(0).toUpperCase();
-    
-    statusMessageEl.textContent = isCreator ? '等待对手加入...' : '等待游戏开始...';
-    
-    // 建立WebSocket连接
-    try {
-        ws = new WebSocket(`ws://115.190.169.197:3001?userId=${currentUser.id}&roomId=${roomId}`);
-        
-        ws.onopen = () => {
-            console.log('WebSocket连接已建立');
-        };
-        
-        ws.onmessage = (event) => {
-            handleWebSocketMessage(event.data);
-        };
-        
-        ws.onclose = () => {
-            console.log('WebSocket连接已关闭');
-            statusMessageEl.textContent = '连接已断开';
-        };
-        
-        ws.onerror = (error) => {
-            console.error('WebSocket错误:', error);
-            alert('连接错误，请刷新页面重试');
-        };
-    } catch (error) {
-        alert('建立连接失败: ' + error.message);
-    }
-}
+// 加入游戏房间函数已移除，因为离线模式下不需要WebSocket连接
 
-// 处理WebSocket消息
-function handleWebSocketMessage(data) {
-    const message = JSON.parse(data);
-    
-    switch (message.type) {
-        case 'game_state':
-            // 初始化游戏状态
-            gameState = message.data;
-            drawChessboard();
-            // 播放游戏开始音效
-            playSound('start');
-            break;
-            
-        case 'move':
-            // 更新棋盘和游戏状态
-            gameState = {
-                board: message.board,
-                currentPlayer: message.nextPlayer,
-                moves: gameState.moves + 1
-            };
-            
-            // 播放落子音效
-            playSound('move');
-            
-            drawChessboard();
-            isMyTurn = (isBlack && message.nextPlayer === 2) || (!isBlack && message.nextPlayer === 1);
-            statusMessageEl.textContent = isMyTurn ? '轮到你下棋' : '等待对手下棋';
-            break;
-            
-        case 'win':
-            // 显示胜利消息
-            const isWinner = message.winner === currentUser.id.toString();
-            statusMessageEl.textContent = isWinner ? '恭喜你获胜！' : '游戏结束，你输了';
-            drawChessboard();
-            // 播放胜利或失败音效
-            playSound(isWinner ? 'win' : 'lose');
-            break;
-            
-        case 'draw':
-            // 显示平局消息
-            statusMessageEl.textContent = '游戏结束，平局';
-            drawChessboard();
-            // 播放平局音效
-            playSound('draw');
-            break;
-    }
-}
+// WebSocket消息处理函数已移除，因为离线模式下不需要
 
 // 处理棋盘点击
 function handleCanvasClick(event) {
@@ -756,43 +594,7 @@ function checkWin(board, x, y, player) {
     return false;
 }
 
-// 显示排行榜
-async function showRankings() {
-    menuPanel.style.display = 'none';
-    rankPanel.style.display = 'block';
-    
-    try {
-        // 这里应该调用API获取排行榜数据
-        // 暂时使用模拟数据
-        const mockRanks = [
-            { id: 1, name: '玩家1', winNum: 15, loseNum: 3, tiedNum: 2 },
-            { id: 2, name: '玩家2', winNum: 12, loseNum: 5, tiedNum: 3 },
-            { id: 3, name: '玩家3', winNum: 10, loseNum: 4, tiedNum: 6 },
-            { id: 4, name: '玩家4', winNum: 8, loseNum: 7, tiedNum: 5 },
-            { id: 5, name: '玩家5', winNum: 6, loseNum: 9, tiedNum: 5 }
-        ];
-        
-        rankBodyEl.innerHTML = '';
-        
-        mockRanks.forEach((user, index) => {
-            const totalGames = user.winNum + user.loseNum + user.tiedNum;
-            const winRate = totalGames > 0 ? ((user.winNum / totalGames) * 100).toFixed(1) : 0;
-            
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${user.name}</td>
-                <td>${user.winNum}</td>
-                <td>${user.loseNum}</td>
-                <td>${user.tiedNum}</td>
-                <td>${winRate}%</td>
-            `;
-            rankBodyEl.appendChild(row);
-        });
-    } catch (error) {
-        alert('获取排行榜失败: ' + error.message);
-    }
-}
+// 排行榜显示函数已移除，因为离线模式下不需要
 
 // 认输
 function giveUp() {
@@ -819,7 +621,6 @@ function leaveRoom() {
 function showMenu() {
     roomListEl.style.display = 'none';
     gamePanel.style.display = 'none';
-    rankPanel.style.display = 'none';
     menuPanel.style.display = 'block';
     
     // 重置游戏状态
@@ -840,10 +641,6 @@ function showMenu() {
 
 // 退出登录
 function logout() {
-    if (ws) {
-        ws.close();
-    }
-    
     currentUser = null;
     currentRoomId = null;
     mainContainer.style.display = 'none';
